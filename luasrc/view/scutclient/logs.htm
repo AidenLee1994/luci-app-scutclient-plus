@@ -1,0 +1,91 @@
+<%+header%>
+
+<style>
+:root{
+--sc-card:#fff;--sc-border:rgba(0,0,0,.07);--sc-txt:#1b2a3e;--sc-txt2:#64748b;
+--sc-accent:#2563eb;--sc-accentL:#eff6ff;--sc-line:#e5e7eb;--sc-r:10px;
+--sc-sh:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.03);
+--sc-sh2:0 4px 14px rgba(0,0,0,.07);
+--sc-t:.2s cubic-bezier(.4,0,.2,1);
+--sc-logbg:#f8fafc;--sc-logborder:#e2e8f0;
+}
+@media(prefers-color-scheme:dark){:root{
+--sc-card:#151d2e;--sc-border:rgba(255,255,255,.06);--sc-txt:#e2e8f0;--sc-txt2:#8896a8;
+--sc-accent:#60a5fa;--sc-accentL:#172240;--sc-line:#1e293b;
+--sc-sh:0 1px 3px rgba(0,0,0,.3);--sc-sh2:0 4px 14px rgba(0,0,0,.4);
+--sc-logbg:#0d1525;--sc-logborder:#1e293b;
+}}
+body.dark,:root[data-darkmode="true"]{
+--sc-card:#151d2e;--sc-border:rgba(255,255,255,.06);--sc-txt:#e2e8f0;--sc-txt2:#8896a8;
+--sc-accent:#60a5fa;--sc-accentL:#172240;--sc-line:#1e293b;
+--sc-sh:0 1px 3px rgba(0,0,0,.3);--sc-sh2:0 4px 14px rgba(0,0,0,.4);
+--sc-logbg:#0d1525;--sc-logborder:#1e293b;
+}
+.sc{width:100%;animation:scIn .35s ease-out}
+@keyframes scIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.sc-c{background:var(--sc-card);border:1px solid var(--sc-border);border-radius:var(--sc-r);box-shadow:var(--sc-sh);padding:18px 20px;margin-bottom:16px;transition:box-shadow var(--sc-t)}
+.sc-c:hover{box-shadow:var(--sc-sh2)}
+.sc-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.sc-toolbar-l{font-size:.78em;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--sc-txt2);display:flex;align-items:center;gap:7px}
+.sc-toolbar-l svg{width:14px;height:14px;opacity:.45}
+
+.sc-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:6px;font-size:.82em;font-weight:500;text-decoration:none!important;border:1px solid var(--sc-line);background:var(--sc-card);color:var(--sc-txt);cursor:pointer;transition:all var(--sc-t);white-space:nowrap}
+.sc-btn:hover{box-shadow:var(--sc-sh);border-color:var(--sc-accent);color:var(--sc-accent)}
+.sc-btn svg{width:14px;height:14px}
+
+.sc-log{
+	width:100%;box-sizing:border-box;
+	min-height:420px;max-height:70vh;
+	padding:14px 16px;margin:0;
+	font-family:"SF Mono","Cascadia Code","Fira Code",Consolas,monospace;
+	font-size:.8em;line-height:1.65;
+	color:var(--sc-txt);background:var(--sc-logbg);
+	border:1px solid var(--sc-logborder);border-radius:8px;
+	resize:vertical;overflow:auto;
+	tab-size:4;white-space:pre-wrap;word-break:break-all;
+}
+.sc-log::-webkit-scrollbar{width:6px}
+.sc-log::-webkit-scrollbar-track{background:transparent}
+.sc-log::-webkit-scrollbar-thumb{background:var(--sc-line);border-radius:3px}
+
+.sc-status{display:flex;align-items:center;gap:8px;font-size:.78em;color:var(--sc-txt2)}
+.sc-status-dot{width:6px;height:6px;border-radius:50%;background:var(--sc-accent);animation:scPulse 2s ease infinite}
+@keyframes scPulse{0%,100%{box-shadow:0 0 0 2px rgba(37,99,235,.2)}50%{box-shadow:0 0 0 5px rgba(37,99,235,.08)}}
+</style>
+
+<div class="sc">
+
+<div class="sc-c">
+	<div class="sc-toolbar">
+		<div class="sc-toolbar-l">
+			<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+			scutclient log
+		</div>
+		<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+			<span class="sc-status"><span class="sc-status-dot"></span> <%:每 3 秒刷新%></span>
+			<a class="sc-btn" onclick='window.open("<%=luci.dispatcher.build_url("admin/services/scutclient/scutclient-log.tar")%>")'>
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+				<%:打包下载%>
+			</a>
+		</div>
+	</div>
+	<textarea class="sc-log" readonly id="syslog">Loading...</textarea>
+</div>
+
+</div>
+
+<script type="text/javascript">
+(function(){
+	var url='<%=luci.dispatcher.build_url("admin/services/scutclient/get_log")%>';
+	function read(){
+		if(typeof L!=='undefined'&&L.get)L.get(url,null,function(x){upd(x.responseText||(x.response))});
+		else if(typeof XHR!=='undefined')XHR.get(url,null,function(x){upd(x.responseText)});
+		else{var x=new XMLHttpRequest();x.open('GET',url,true);x.onload=function(){if(x.status===200)upd(x.responseText)};x.send()}
+	}
+	function upd(t){var e=document.getElementById("syslog");if(t&&t!=='_nodata_')e.textContent=t;e.scrollTop=e.scrollHeight}
+	read();setInterval(read,3000);
+})();
+</script>
+
+<%+footer%>

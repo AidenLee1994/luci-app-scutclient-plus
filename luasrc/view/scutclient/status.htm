@@ -1,0 +1,362 @@
+<%
+-- LuCI by Aiden Lee  — Redesigned for OpenWrt 25.x
+local sys  = require "luci.sys"
+local fs = require "nixio.fs"
+local uci = require "luci.model.uci".cursor()
+local ntm = require "luci.model.network".init()
+local scutclient_version = luci.sys.exec("opkg list-installed scutclient 2>/dev/null | cut -d ' ' -f 3")
+local ss = {}
+ss.enable = uci:get_first("scutclient", "option", "enable")
+ss.username = uci:get_first("scutclient", "scutclient", "username")
+ss.password = uci:get_first("scutclient", "scutclient", "password")
+ss.hostname = uci:get_first("scutclient", "drcom", "hostname")
+ss.version = uci:get_first("scutclient", "drcom", "version")
+ss.hash = uci:get_first("scutclient", "drcom", "hash")
+ss.server_auth_ip = uci:get_first("scutclient", "drcom", "server_auth_ip")
+ss.nettime = uci:get_first("scutclient", "drcom", "nettime")
+local ml = {}
+ml.base = luci.dispatcher.build_url("admin/services/scutclient/status")
+ml.redial = ml.base.."?redial=1"
+ml.logoff = ml.base.."?logoff=1"
+ml.enable = ml.base.."?enable=1"
+ml.disable = ml.base.."?disable=1"
+
+local stat, wan_nets = pcall(ntm.get_wan_networks, ntm)
+local wan, wandev
+if stat then
+	if wan_nets and #wan_nets > 0 then wan = wan_nets[1]; wandev = wan:get_interface() end
+else
+	local ok1, w = pcall(ntm.get_wannet, ntm)
+	local ok2, wd = pcall(ntm.get_wandev, ntm)
+	if ok1 then wan = w end
+	if ok2 then wandev = wd end
+end
+
+local function is_running()
+	local ret = os.execute("pidof scutclient > /dev/null 2>/dev/null")
+	return (ret == 0 or ret == true)
+end
+
+local function wifi_on()
+	local r = luci.sys.exec("wifi status 2>/dev/null | grep up | head -n 1 | awk '{print $2}'")
+	return (string.sub(r or "", 1, 4) == "true")
+end
+
+local running = is_running()
+local wifion = wifi_on()
+%>
+
+<%+header%>
+
+<style>
+:root{
+--sc-card:#fff;--sc-border:rgba(0,0,0,.07);--sc-txt:#1b2a3e;--sc-txt2:#64748b;
+--sc-accent:#2563eb;--sc-accentL:#eff6ff;--sc-ok:#059669;--sc-okBg:#ecfdf5;
+--sc-warn:#d97706;--sc-warnBg:#fffbeb;--sc-err:#dc2626;--sc-errBg:#fef2f2;
+--sc-line:#e5e7eb;--sc-r:10px;
+--sc-sh:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.03);
+--sc-sh2:0 4px 14px rgba(0,0,0,.07),0 2px 4px rgba(0,0,0,.03);
+--sc-t:.2s cubic-bezier(.4,0,.2,1);
+}
+@media(prefers-color-scheme:dark){:root{
+--sc-card:#151d2e;--sc-border:rgba(255,255,255,.06);--sc-txt:#e2e8f0;--sc-txt2:#8896a8;
+--sc-accent:#60a5fa;--sc-accentL:#172240;--sc-ok:#34d399;--sc-okBg:#0d2818;
+--sc-warn:#fbbf24;--sc-warnBg:#2a1f05;--sc-err:#f87171;--sc-errBg:#2d0f0f;
+--sc-line:#1e293b;
+--sc-sh:0 1px 3px rgba(0,0,0,.3);--sc-sh2:0 4px 14px rgba(0,0,0,.4);
+}}
+body.dark,:root[data-darkmode="true"]{
+--sc-card:#151d2e;--sc-border:rgba(255,255,255,.06);--sc-txt:#e2e8f0;--sc-txt2:#8896a8;
+--sc-accent:#60a5fa;--sc-accentL:#172240;--sc-ok:#34d399;--sc-okBg:#0d2818;
+--sc-warn:#fbbf24;--sc-warnBg:#2a1f05;--sc-err:#f87171;--sc-errBg:#2d0f0f;
+--sc-line:#1e293b;
+--sc-sh:0 1px 3px rgba(0,0,0,.3);--sc-sh2:0 4px 14px rgba(0,0,0,.4);
+}
+.sc{width:100%;animation:scIn .35s ease-out}
+@keyframes scIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.sc-ban{display:flex;align-items:center;gap:14px;padding:14px 20px;border-radius:var(--sc-r);margin-bottom:18px;border:1px solid;flex-wrap:wrap}
+.sc-ban.ok{background:var(--sc-okBg);border-color:var(--sc-ok)}
+.sc-ban.no{background:var(--sc-errBg);border-color:var(--sc-err)}
+.sc-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.sc-ban.ok .sc-dot{background:var(--sc-ok);animation:scPulse 2s ease infinite}
+.sc-ban.no .sc-dot{background:var(--sc-err)}
+@keyframes scPulse{0%,100%{box-shadow:0 0 0 3px rgba(5,150,105,.2)}50%{box-shadow:0 0 0 7px rgba(5,150,105,.08)}}
+.sc-ban-t{font-size:.92em;font-weight:600}
+.sc-ban.ok .sc-ban-t{color:var(--sc-ok)}.sc-ban.no .sc-ban-t{color:var(--sc-err)}
+.sc-ban-r{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+
+.sc-btn{display:inline-flex;align-items:center;gap:5px;padding:6px 14px;border-radius:6px;font-size:.82em;font-weight:500;text-decoration:none!important;border:1px solid var(--sc-line);background:var(--sc-card);color:var(--sc-txt);cursor:pointer;transition:all var(--sc-t);white-space:nowrap}
+.sc-btn:hover{box-shadow:var(--sc-sh);border-color:var(--sc-accent);color:var(--sc-accent)}
+.sc-btn svg{width:14px;height:14px}
+.sc-btn-d{border-color:var(--sc-err);color:var(--sc-err)}
+.sc-btn-d:hover{background:var(--sc-err);color:#fff;border-color:var(--sc-err)}
+.sc-btn-ok{border-color:var(--sc-ok);color:var(--sc-ok)}
+.sc-btn-ok:hover{background:var(--sc-ok);color:#fff;border-color:var(--sc-ok)}
+.sc-btn-primary{background:var(--sc-accent);color:#fff;border-color:var(--sc-accent)}
+.sc-btn-primary:hover{opacity:.85;color:#fff;border-color:var(--sc-accent)}
+
+.sc-g{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:720px){.sc-g{grid-template-columns:1fr}.sc-ban-r{margin-left:0;margin-top:8px;width:100%;justify-content:flex-end}}
+.sc-c{background:var(--sc-card);border:1px solid var(--sc-border);border-radius:var(--sc-r);box-shadow:var(--sc-sh);padding:18px 20px;transition:box-shadow var(--sc-t)}
+.sc-c:hover{box-shadow:var(--sc-sh2)}
+.sc-c-f{grid-column:1/-1}
+.sc-ct{font-size:.72em;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--sc-txt2);margin-bottom:14px;padding-bottom:9px;border-bottom:1px solid var(--sc-line);display:flex;align-items:center;gap:7px}
+.sc-ct svg{width:14px;height:14px;opacity:.45}
+
+.sc-r{display:flex;align-items:center;padding:7px 0;font-size:.88em}
+.sc-r+.sc-r{border-top:1px solid var(--sc-line)}
+.sc-rl{color:var(--sc-txt2);min-width:80px;flex-shrink:0}
+.sc-rv{color:var(--sc-txt);font-weight:500;word-break:break-all;font-family:"SF Mono","Cascadia Code","Fira Code",Consolas,monospace;font-size:.92em;flex:1;min-width:0}
+
+.sc-b{display:inline-flex;align-items:center;gap:5px;padding:2px 10px;border-radius:20px;font-size:.78em;font-weight:600;font-family:inherit}
+.sc-b-ok{background:var(--sc-okBg);color:var(--sc-ok)}
+.sc-b-w{background:var(--sc-warnBg);color:var(--sc-warn)}
+.sc-b-e{background:var(--sc-errBg);color:var(--sc-err)}
+.sc-bd{width:6px;height:6px;border-radius:50%;background:currentColor}
+
+.sc-ver{font-family:"SF Mono","Cascadia Code",Consolas,monospace;background:var(--sc-accentL);color:var(--sc-accent);padding:2px 8px;border-radius:4px;font-size:.84em}
+
+.sc-input{font-family:"SF Mono","Cascadia Code","Fira Code",Consolas,monospace;font-size:.88em;font-weight:500;color:var(--sc-txt);background:var(--sc-card);border:1px solid var(--sc-line);border-radius:5px;padding:5px 8px;width:100%;max-width:320px;outline:none;transition:border-color var(--sc-t);box-sizing:border-box}
+.sc-input:focus{border-color:var(--sc-accent)}
+
+/* combobox */
+.sc-cb{position:relative;width:100%;max-width:320px}
+.sc-cb-display{display:flex;align-items:center;gap:6px;font-family:"SF Mono","Cascadia Code","Fira Code",Consolas,monospace;font-size:.85em;font-weight:500;color:var(--sc-txt);background:var(--sc-card);border:1px solid var(--sc-line);border-radius:5px;padding:5px 8px;cursor:pointer;transition:border-color var(--sc-t);user-select:none;min-height:28px;box-sizing:border-box}
+.sc-cb-display:hover,.sc-cb.open .sc-cb-display{border-color:var(--sc-accent)}
+.sc-cb-arrow{margin-left:auto;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;border-top:5px solid var(--sc-txt2);flex-shrink:0;transition:transform var(--sc-t)}
+.sc-cb.open .sc-cb-arrow{transform:rotate(180deg)}
+.sc-cb-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.sc-cb-drop{display:none;position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--sc-card);border:1px solid var(--sc-line);border-radius:5px;box-shadow:var(--sc-sh2);z-index:100;max-height:200px;overflow-y:auto}
+.sc-cb.open .sc-cb-drop{display:block}
+.sc-cb-opt{padding:6px 10px;font-size:.84em;cursor:pointer;color:var(--sc-txt);font-family:"SF Mono","Cascadia Code","Fira Code",Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:background var(--sc-t)}
+.sc-cb-opt:hover{background:var(--sc-accentL)}
+.sc-cb-opt.active{background:var(--sc-accentL);color:var(--sc-accent);font-weight:600}
+.sc-cb-opt.sc-cb-custom{color:var(--sc-accent);font-family:inherit;font-style:italic;border-top:1px solid var(--sc-line)}
+.sc-cb-edit{display:none;width:100%;margin-top:4px}
+.sc-cb-edit input{width:100%;box-sizing:border-box}
+.sc-cb input[name]{position:absolute;opacity:0;pointer-events:none;width:0;height:0}
+
+.sc-2c{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
+@media(max-width:720px){.sc-2c{grid-template-columns:1fr}}
+.sc-2c-f{grid-column:1/-1}
+
+.sc-save-bar{display:flex;align-items:center;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--sc-line);flex-wrap:wrap}
+@media(max-width:540px){.sc-save-bar{justify-content:center}}
+</style>
+
+<div class="sc">
+
+<!-- Banner -->
+<div class="sc-ban <%=running and 'ok' or 'no'%>">
+	<span class="sc-dot"></span>
+	<span class="sc-ban-t">scutclient — <% if running then %><%:正在运行%><% else %><%:没有运行%><% end %></span>
+	<div class="sc-ban-r">
+		<% if ss.enable == "1" then %>
+		<a href="<%=ml.disable%>" class="sc-btn sc-btn-d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="9" x2="15" y2="15"/><line x1="15" y1="9" x2="9" y2="15"/></svg><%:禁用%></a>
+		<% else %>
+		<a href="<%=ml.enable%>" class="sc-btn sc-btn-ok"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg><%:启用%></a>
+		<% end %>
+		<a href="<%=ml.redial%>" class="sc-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><%:重拨%></a>
+		<a href="<%=ml.logoff%>" class="sc-btn sc-btn-d"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"/><line x1="12" y1="2" x2="12" y2="12"/></svg><%:下线%></a>
+	</div>
+</div>
+
+<div class="sc-g">
+
+	<!-- Network -->
+	<div class="sc-c">
+		<div class="sc-ct"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3a4.24 4.24 0 00-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/></svg><%:网络信息%></div>
+		<% if wan and wandev then %>
+		<div class="sc-r"><span class="sc-rl">WAN</span><span class="sc-rv"><%=wandev:name()%></span></div>
+		<div class="sc-r"><span class="sc-rl">IP</span><span class="sc-rv" id="s_ip"><%=wan:ipaddr()%></span></div>
+		<div class="sc-r"><span class="sc-rl"><%:掩码%></span><span class="sc-rv"><%=wan:netmask()%></span></div>
+		<div class="sc-r"><span class="sc-rl"><%:网关%></span><span class="sc-rv" id="s_gw"><%=wan:gwaddr()%></span></div>
+		<div class="sc-r"><span class="sc-rl">DNS</span><span class="sc-rv"><%=table.concat(wan:dnsaddrs(), ", ")%></span></div>
+		<div class="sc-r"><span class="sc-rl">MAC</span><span class="sc-rv"><%=wandev:mac()%></span></div>
+		<div class="sc-r"><span class="sc-rl"><%:状态%></span><span class="sc-rv" id="sc_ns"><span class="sc-b sc-b-w"><span class="sc-bd"></span> <%:检测中%></span></span></div>
+		<% else %>
+		<div class="sc-r"><span class="sc-b sc-b-e"><span class="sc-bd"></span> <%:WAN口未正确配置%></span></div>
+		<% end %>
+	</div>
+
+	<!-- Environment -->
+	<div class="sc-c">
+		<div class="sc-ct"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg><%:环境信息%></div>
+		<div class="sc-r"><span class="sc-rl">Wi-Fi</span><span class="sc-rv"><% if wifion then %><span style="color:var(--sc-accent);font-weight:600"><%=luci.sys.exec("uci get wireless.@wifi-iface[0].ssid 2>/dev/null")%></span><% else %><span class="sc-b sc-b-w"><%:未开启%></span><% end %></span></div>
+		<div class="sc-r"><span class="sc-rl"><%:版本%></span><span class="sc-rv"><% if string.len(scutclient_version) > 1 then %><span class="sc-ver">v<%=scutclient_version%></span><% else %><span class="sc-b sc-b-e"><%:未安装%></span><% end %></span></div>
+		<div class="sc-r"><span class="sc-rl"><%:启动%></span><span class="sc-rv"><% if ss.enable == "1" then %><span class="sc-b sc-b-ok"><span class="sc-bd"></span> <%:已启用%></span><% else %><span class="sc-b sc-b-e"><span class="sc-bd"></span> <%:未启用%></span><% end %></span></div>
+		<div class="sc-r"><span class="sc-rl"><%:服务器%></span><span class="sc-rv" data-cb="cfg_server" data-val="<%=ss.server_auth_ip or ""%>" data-opts="202.38.210.131" form="sc_form"></span></div>
+		<div class="sc-r"><span class="sc-rl"><%:上网时间%></span><span class="sc-rv"><input class="sc-input" type="text" name="cfg_nettime" value="<%=ss.nettime or ""%>" form="sc_form" placeholder="<%:如 6:15%>" style="max-width:160px"></span></div>
+	</div>
+
+	<!-- Auth info (full width, editable) -->
+	<div class="sc-c sc-c-f">
+		<div class="sc-ct"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg><%:认证信息%></div>
+		<form id="sc_form" method="get" action="<%=ml.base%>">
+		<div class="sc-2c">
+			<div class="sc-r"><span class="sc-rl"><%:账号%></span><span class="sc-rv"><input class="sc-input" type="text" name="cfg_username" value="<%=ss.username or ""%>"></span></div>
+			<div class="sc-r"><span class="sc-rl"><%:密码%></span><span class="sc-rv"><input class="sc-input" type="password" name="cfg_password" value="<%=ss.password or ""%>" id="sc_pw_input"></span></div>
+			<div class="sc-r"><span class="sc-rl"><%:主机名%></span><span class="sc-rv"><input class="sc-input" type="text" name="cfg_hostname" value="<%=ss.hostname or ""%>"></span></div>
+			<div class="sc-r"><span class="sc-rl">Drcom</span><span class="sc-rv" data-cb="cfg_version" data-val="<%=ss.version or ""%>" data-opts="4472434f4d0096022a|4472434f4d0096022a00636b2031|4472434f4d00cf072a00332e31332e302d32342d67656e65726963"></span></div>
+			<div class="sc-r sc-2c-f"><span class="sc-rl">Hash</span><span class="sc-rv" data-cb="cfg_hash" data-val="<%=ss.hash or ""%>" data-opts="2ec15ad258aee9604b18f2f8114da38db16efd00|d985f3d51656a15837e00fab41d3013ecfb6313f|915e3d0281c3a0bdec36d7f9c15e7a16b59c12b8"></span></div>
+		</div>
+		<div class="sc-save-bar">
+			<a class="sc-btn" onclick="document.getElementById('sc_pw_input').type=document.getElementById('sc_pw_input').type==='password'?'text':'password'" style="cursor:pointer">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+				<%:显示密码%>
+			</a>
+			<span style="flex:1"></span>
+			<a class="sc-btn" onclick="scResetForm()" style="cursor:pointer;border-color:var(--sc-warn);color:var(--sc-warn)">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+				<%:复位%>
+			</a>
+			<button type="submit" name="save" value="1" class="sc-btn">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+				<%:保存%>
+			</button>
+			<button type="submit" name="save_apply" value="1" class="sc-btn sc-btn-primary">
+				<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+				<%:保存并应用%>
+			</button>
+		</div>
+		</form>
+	</div>
+
+</div>
+</div>
+
+<script type="text/javascript">
+(function(){
+	/* === Combobox init === */
+	function truncate(s, n) { return s.length > n ? s.substring(0, n/2) + '..' + s.substring(s.length - n/2) : s; }
+
+	document.querySelectorAll('[data-cb]').forEach(function(el) {
+		var name = el.getAttribute('data-cb');
+		var curVal = el.getAttribute('data-val') || '';
+		var opts = (el.getAttribute('data-opts') || '').split('|').filter(function(o){return o;});
+		var formId = el.getAttribute('form') || null;
+		var isPreset = opts.indexOf(curVal) >= 0;
+
+		var wrap = document.createElement('div');
+		wrap.className = 'sc-cb';
+
+		var hidden = document.createElement('input');
+		hidden.type = 'hidden'; hidden.name = name; hidden.value = curVal;
+		if (formId) hidden.setAttribute('form', formId);
+
+		var display = document.createElement('div');
+		display.className = 'sc-cb-display';
+		var textSpan = document.createElement('span');
+		textSpan.className = 'sc-cb-text';
+		textSpan.textContent = curVal ? truncate(curVal, 36) : '—';
+		var arrow = document.createElement('span');
+		arrow.className = 'sc-cb-arrow';
+		display.appendChild(textSpan);
+		display.appendChild(arrow);
+
+		var drop = document.createElement('div');
+		drop.className = 'sc-cb-drop';
+
+		opts.forEach(function(o) {
+			var opt = document.createElement('div');
+			opt.className = 'sc-cb-opt' + (o === curVal ? ' active' : '');
+			opt.textContent = truncate(o, 42);
+			opt.setAttribute('data-v', o);
+			opt.addEventListener('click', function(e) {
+				e.stopPropagation();
+				hidden.value = o;
+				textSpan.textContent = truncate(o, 36);
+				wrap.classList.remove('open');
+				editWrap.style.display = 'none';
+				drop.querySelectorAll('.sc-cb-opt').forEach(function(x){x.classList.remove('active')});
+				opt.classList.add('active');
+			});
+			drop.appendChild(opt);
+		});
+
+		var customOpt = document.createElement('div');
+		customOpt.className = 'sc-cb-opt sc-cb-custom';
+		customOpt.textContent = '<%:自定义输入…%>';
+		customOpt.addEventListener('click', function(e) {
+			e.stopPropagation();
+			editWrap.style.display = 'block';
+			editInput.value = hidden.value;
+			editInput.focus();
+			drop.querySelectorAll('.sc-cb-opt').forEach(function(x){x.classList.remove('active')});
+		});
+		drop.appendChild(customOpt);
+
+		var editWrap = document.createElement('div');
+		editWrap.className = 'sc-cb-edit';
+		var editInput = document.createElement('input');
+		editInput.className = 'sc-input';
+		editInput.type = 'text';
+		editInput.placeholder = '<%:输入自定义值后回车或点击其他区域%>';
+		editInput.style.fontSize = '.84em';
+		function commitCustom() {
+			var v = editInput.value.trim();
+			if (v) {
+				hidden.value = v;
+				textSpan.textContent = truncate(v, 36);
+			}
+			editWrap.style.display = 'none';
+			wrap.classList.remove('open');
+		}
+		editInput.addEventListener('keydown', function(e) { if(e.key === 'Enter') { e.preventDefault(); commitCustom(); } });
+		editInput.addEventListener('blur', function() { setTimeout(commitCustom, 150); });
+		editWrap.appendChild(editInput);
+
+		display.addEventListener('click', function(e) {
+			e.stopPropagation();
+			var wasOpen = wrap.classList.contains('open');
+			document.querySelectorAll('.sc-cb.open').forEach(function(c){c.classList.remove('open')});
+			if (!wasOpen) wrap.classList.add('open');
+		});
+
+		wrap.appendChild(hidden);
+		wrap.appendChild(display);
+		wrap.appendChild(drop);
+		wrap.appendChild(editWrap);
+		el.innerHTML = '';
+		el.appendChild(wrap);
+	});
+
+	document.addEventListener('click', function() {
+		document.querySelectorAll('.sc-cb.open').forEach(function(c){c.classList.remove('open')});
+	});
+
+	/* === Reset === */
+	window.scResetForm = function() {
+		document.getElementById('sc_form').reset();
+		document.querySelectorAll('[data-cb]').forEach(function(el) {
+			var origVal = el.getAttribute('data-val') || '';
+			var h = el.querySelector('input[type=hidden]');
+			var t = el.querySelector('.sc-cb-text');
+			if (h) h.value = origVal;
+			if (t) t.textContent = origVal ? (origVal.length > 36 ? origVal.substring(0,18)+'..'+origVal.substring(origVal.length-18) : origVal) : '—';
+			var ed = el.querySelector('.sc-cb-edit');
+			if (ed) ed.style.display = 'none';
+		});
+	};
+
+	/* === IP/GW check === */
+	var ip=document.getElementById("s_ip"),gw=document.getElementById("s_gw");
+	if(ip&&gw){var a=ip.textContent.trim().match(/\d+/g),b=gw.textContent.trim().match(/\d+/g);
+	if(a&&b&&a.length>=3&&b.length>=3){for(var i=0,ok=true;i<3;i++)if(parseInt(a[i])!==parseInt(b[i])){ok=false;break}
+	if(!ok){ip.style.color="var(--sc-err)";gw.style.color="var(--sc-err)"}}}
+
+	/* === Net status === */
+	var url='<%=luci.dispatcher.build_url("admin","services","scutclient","netstat")%>';
+	function req(){
+		if(typeof L!=='undefined'&&L.get)L.get(url,null,function(x,r){cb(r)});
+		else if(typeof XHR!=='undefined')XHR.get(url,null,function(x,r){cb(r)});
+		else{var x=new XMLHttpRequest();x.open('GET',url,true);x.responseType='json';x.onload=function(){if(x.status===200)cb(x.response)};x.send()}
+	}
+	function cb(r){var e=document.getElementById("sc_ns");if(!e||!r||typeof r!=='object')return;
+	var m={'internet':{t:'<%:网络正常%>',c:'sc-b-ok'},'no_login':{t:'<%:未登录%>',c:'sc-b-w'},'no_internet':{t:'<%:网络异常%>',c:'sc-b-e'}};
+	var i=m[r.stat]||m['no_internet'];e.innerHTML='<span class="sc-b '+i.c+'"><span class="sc-bd"></span> '+i.t+'</span>'}
+	req();
+})();
+</script>
+<%+footer%>

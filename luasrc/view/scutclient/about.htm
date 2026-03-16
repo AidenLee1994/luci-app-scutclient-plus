@@ -1,0 +1,61 @@
+<%+header%>
+
+<style>
+:root{
+--sc-card:#fff;--sc-border:rgba(0,0,0,.07);--sc-txt:#1b2a3e;--sc-txt2:#64748b;
+--sc-accent:#2563eb;--sc-accentL:#eff6ff;--sc-line:#e5e7eb;--sc-r:10px;
+--sc-sh:0 1px 3px rgba(0,0,0,.05),0 1px 2px rgba(0,0,0,.03);
+--sc-sh2:0 4px 14px rgba(0,0,0,.07);
+--sc-t:.2s cubic-bezier(.4,0,.2,1);
+}
+@media(prefers-color-scheme:dark){:root{
+--sc-card:#151d2e;--sc-border:rgba(255,255,255,.06);--sc-txt:#e2e8f0;--sc-txt2:#8896a8;
+--sc-accent:#60a5fa;--sc-accentL:#172240;--sc-line:#1e293b;
+--sc-sh:0 1px 3px rgba(0,0,0,.3);--sc-sh2:0 4px 14px rgba(0,0,0,.4);
+}}
+body.dark,:root[data-darkmode="true"]{
+--sc-card:#151d2e;--sc-border:rgba(255,255,255,.06);--sc-txt:#e2e8f0;--sc-txt2:#8896a8;
+--sc-accent:#60a5fa;--sc-accentL:#172240;--sc-line:#1e293b;
+--sc-sh:0 1px 3px rgba(0,0,0,.3);--sc-sh2:0 4px 14px rgba(0,0,0,.4);
+}
+.sc{width:100%;max-width:600px;margin:0 auto;animation:scIn .35s ease-out}
+@keyframes scIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.sc-c{background:var(--sc-card);border:1px solid var(--sc-border);border-radius:var(--sc-r);box-shadow:var(--sc-sh);padding:24px 28px;margin-bottom:16px;text-align:center;transition:box-shadow var(--sc-t)}
+.sc-c:hover{box-shadow:var(--sc-sh2)}
+.sc-c h3{font-size:1em;font-weight:600;color:var(--sc-txt);margin:0 0 10px}
+.sc-c p{font-size:.88em;color:var(--sc-txt2);margin:6px 0;line-height:1.6}
+.sc-c a{color:var(--sc-accent);text-decoration:none;font-weight:500}
+.sc-c a:hover{text-decoration:underline}
+.sc-cat{font-size:2em;margin-bottom:4px}
+.sc-divider{height:1px;background:var(--sc-line);margin:14px 0}
+@media(max-width:640px){
+.sc{padding:0 12px}
+.sc-c{padding:18px 16px}
+}
+</style>
+
+<div class="sc">
+
+<div class="sc-c">
+	<h3><%:许可证%></h3>
+	<p><a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank">AGPL v3</a></p>
+	<p style="font-size:.82em;">特别指出禁止任何个人或组织将 scutclient 的代码投入商业使用，由此造成的后果和法律责任后果自负。</p>
+</div>
+
+<div class="sc-c">
+	<div class="sc-cat">ฅ(⌯͒• ɪ •⌯͒)ฅ❣</div>
+	<h3><%:致谢%></h3>
+	<p>我养了五只小猫咪：大白、崽崽、糖糖、帕米和可人</p>
+	<div class="sc-divider"></div>
+	<p>
+		<a href="https://www2.scut.edu.cn/cs/" target="_blank">华工计算机科学与工程学院</a>
+	</p>
+	<p>
+		希望将来的我可以成为大院士，现在先叫我 Dr. Lee.
+	</p>
+</div>
+
+
+</div>
+
+<%+footer%>
