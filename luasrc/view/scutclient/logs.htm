@@ -83,7 +83,16 @@ body.dark,:root[data-darkmode="true"]{
 		else if(typeof XHR!=='undefined')XHR.get(url,null,function(x){upd(x.responseText)});
 		else{var x=new XMLHttpRequest();x.open('GET',url,true);x.onload=function(){if(x.status===200)upd(x.responseText)};x.send()}
 	}
-	function upd(t){var e=document.getElementById("syslog");if(t&&t!=='_nodata_')e.textContent=t;e.scrollTop=e.scrollHeight}
+	function upd(t){
+		var e=document.getElementById("syslog");
+		if(!e)return;
+		if(t&&t!=='_nodata_'&&t.trim()!==''){
+			e.textContent=t;
+			e.scrollTop=e.scrollHeight;
+		}else if(t===undefined||t===null||t.trim()===''){
+			if(e.textContent==='Loading...')e.textContent='(日志为空)';
+		}
+	}
 	read();setInterval(read,3000);
 })();
 </script>
