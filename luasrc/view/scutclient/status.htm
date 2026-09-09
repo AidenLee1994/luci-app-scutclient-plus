@@ -5,6 +5,8 @@ local fs = require "nixio.fs"
 local uci = require "luci.model.uci".cursor()
 local ntm = require "luci.model.network".init()
 local scutclient_version = luci.sys.exec("opkg list-installed scutclient 2>/dev/null | cut -d ' ' -f 3")
+local _ssid = ""
+uci:foreach("wireless", "wifi-iface", function(s) if s.ssid then _ssid = s.ssid end; return false end)
 local ss = {}
 ss.enable = uci:get_first("scutclient", "option", "enable")
 ss.username = uci:get_first("scutclient", "scutclient", "username")
@@ -170,7 +172,7 @@ body.dark,:root[data-darkmode="true"]{
 		<% if wan and wandev then %>
 		<div class="sc-r"><span class="sc-rl">WAN</span><span class="sc-rv"><%=wandev:name()%></span></div>
 		<div class="sc-r"><span class="sc-rl">IP</span><span class="sc-rv" id="s_ip"><%=wan:ipaddr()%></span></div>
-		<div class="sc-r"><span class="sc-rl"><%:掩码%></span><span class="sc-rv"><%=wan:netmask()%></span></div>
+		<div class="sc-r"><span class="sc-rl"><%:掩码%></span><span class="sc-rv" id="sc_nm"><%=wan:netmask()%></span></div>
 		<div class="sc-r"><span class="sc-rl"><%:网关%></span><span class="sc-rv" id="s_gw"><%=wan:gwaddr()%></span></div>
 		<div class="sc-r"><span class="sc-rl">DNS</span><span class="sc-rv"><%=table.concat(wan:dnsaddrs(), ", ")%></span></div>
 		<div class="sc-r"><span class="sc-rl">MAC</span><span class="sc-rv"><%=wandev:mac()%></span></div>
@@ -183,7 +185,7 @@ body.dark,:root[data-darkmode="true"]{
 	<!-- Environment -->
 	<div class="sc-c">
 		<div class="sc-ct"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg><%:环境信息%></div>
-		<div class="sc-r"><span class="sc-rl">Wi-Fi</span><span class="sc-rv"><% if wifion then %><span style="color:var(--sc-accent);font-weight:600"><%=luci.sys.exec("uci get wireless.@wifi-iface[0].ssid 2>/dev/null")%></span><% else %><span class="sc-b sc-b-w"><%:未开启%></span><% end %></span></div>
+		<div class="sc-r"><span class="sc-rl">Wi-Fi</span><span class="sc-rv"><% if wifion then %><span style="color:var(--sc-accent);font-weight:600"><%=_ssid%></span><% else %><span class="sc-b sc-b-w"><%:未开启%></span><% end %></span></div>
 		<div class="sc-r"><span class="sc-rl"><%:版本%></span><span class="sc-rv"><% if string.len(scutclient_version) > 1 then %><span class="sc-ver">v<%=scutclient_version%></span><% else %><span class="sc-b sc-b-e"><%:未安装%></span><% end %></span></div>
 		<div class="sc-r"><span class="sc-rl"><%:启动%></span><span class="sc-rv"><% if ss.enable == "1" then %><span class="sc-b sc-b-ok"><span class="sc-bd"></span> <%:已启用%></span><% else %><span class="sc-b sc-b-e"><span class="sc-bd"></span> <%:未启用%></span><% end %></span></div>
 		<div class="sc-r"><span class="sc-rl"><%:服务器%></span><span class="sc-rv" data-cb="cfg_server" data-val="<%=ss.server_auth_ip or ""%>" data-opts="202.38.210.131" form="sc_form"></span></div>
@@ -193,7 +195,7 @@ body.dark,:root[data-darkmode="true"]{
 	<!-- Auth info (full width, editable) -->
 	<div class="sc-c sc-c-f">
 		<div class="sc-ct"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1s3.1 1.39 3.1 3.1v2z"/></svg><%:认证信息%></div>
-		<form id="sc_form" method="get" action="<%=ml.base%>">
+		<form id="sc_form" method="post" action="<%=ml.base%>">
 		<div class="sc-2c">
 			<div class="sc-r"><span class="sc-rl"><%:账号%></span><span class="sc-rv"><input class="sc-input" type="text" name="cfg_username" value="<%=ss.username or ""%>"></span></div>
 			<div class="sc-r"><span class="sc-rl"><%:密码%></span><span class="sc-rv"><input class="sc-input" type="password" name="cfg_password" value="<%=ss.password or ""%>" id="sc_pw_input"></span></div>
@@ -340,13 +342,19 @@ body.dark,:root[data-darkmode="true"]{
 		});
 	};
 
-	/* === IP/GW check === */
-	var ip=document.getElementById("s_ip"),gw=document.getElementById("s_gw");
-	if(ip&&gw){var a=ip.textContent.trim().match(/\d+/g),b=gw.textContent.trim().match(/\d+/g);
-	if(a&&b&&a.length>=3&&b.length>=3){for(var i=0,ok=true;i<3;i++)if(parseInt(a[i])!==parseInt(b[i])){ok=false;break}
-	if(!ok){ip.style.color="var(--sc-err)";gw.style.color="var(--sc-err)"}}}
+	/* === IP/GW subnet check using real netmask === */
+	(function(){
+		var ipEl=document.getElementById("s_ip"),gwEl=document.getElementById("s_gw"),nmEl=document.getElementById("sc_nm");
+		if(!ipEl||!gwEl||!nmEl)return;
+		function toInt(s){var p=s.trim().split(".");if(p.length!==4)return null;
+			return p.reduce(function(a,o){return(a<<8)|parseInt(o,10)},0)>>>0;}
+		var ip=toInt(ipEl.textContent),gw=toInt(gwEl.textContent),nm=toInt(nmEl.textContent);
+		if(ip!==null&&gw!==null&&nm!==null&&((ip&nm)>>>0)!==((gw&nm)>>>0)){
+			ipEl.style.color="var(--sc-err)";gwEl.style.color="var(--sc-err)";
+		}
+	})();
 
-	/* === Net status === */
+	/* === Net status (poll every 30 s) === */
 	var url='<%=luci.dispatcher.build_url("admin","services","scutclient","netstat")%>';
 	function req(){
 		if(typeof L!=='undefined'&&L.get)L.get(url,null,function(x,r){cb(r)});
@@ -356,7 +364,7 @@ body.dark,:root[data-darkmode="true"]{
 	function cb(r){var e=document.getElementById("sc_ns");if(!e||!r||typeof r!=='object')return;
 	var m={'internet':{t:'<%:网络正常%>',c:'sc-b-ok'},'no_login':{t:'<%:未登录%>',c:'sc-b-w'},'no_internet':{t:'<%:网络异常%>',c:'sc-b-e'}};
 	var i=m[r.stat]||m['no_internet'];e.innerHTML='<span class="sc-b '+i.c+'"><span class="sc-bd"></span> '+i.t+'</span>'}
-	req();
+	req();setInterval(req,30000);
 })();
 </script>
 <%+footer%>
