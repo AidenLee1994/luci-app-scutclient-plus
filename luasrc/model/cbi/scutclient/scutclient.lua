@@ -7,13 +7,26 @@ string.split = function(s, p)
 	return rt
 end
 
+-- Resolve the wireless settings URL dynamically so the button works on any
+-- device regardless of interface naming (radio0/radio1, network1/wlan, etc.).
+-- Falls back to the wireless overview page if no wifi-iface section exists.
+local _uci_wlan = require("luci.model.uci").cursor()
+local _wifi_url  = luci.dispatcher.build_url("admin/network/wireless")
+_uci_wlan:foreach("wireless", "wifi-iface", function(s)
+	if s.device and s.network then
+		_wifi_url = luci.dispatcher.build_url(
+			"admin/network/wireless/" .. s.device .. "." .. s.network)
+		return false  -- stop after the first interface
+	end
+end)
+
 scut = Map(
 		"scutclient",
 		translate("华南理工大学客户端 设置"),
 		' <input style="margin: 2px;" class="cbi-button cbi-button-apply" type="button" value="'
 				.."Step 1 : 点此处去设置Wi-Fi"
 				..'" onclick="javascript:location.href=\''
-				..luci.dispatcher.build_url("admin/network/wireless/radio0.network1")
+				.._wifi_url
 				..'\'"/>'
 				..' <input style="margin: 2px;" class="cbi-button cbi-button-apply" type="button" value="'
 				.."Step 2 : 点此处去设置IP"
