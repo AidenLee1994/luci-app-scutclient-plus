@@ -3,7 +3,7 @@
 > LuCI web UI for [scutclient](https://github.com/scutclient/scutclient) — OpenWrt campus-network authentication plugin for South China University of Technology (SCUT / 华南理工大学) DRCOM broadband.
 
 ![OpenWrt](https://img.shields.io/badge/OpenWrt-21.xx%20~%2025.xx-blue)
-![License](https://img.shields.io/badge/license-Apache--2.0-green)
+![License](https://img.shields.io/badge/license-Apache--3.0-green)
 ![LuCI](https://img.shields.io/badge/LuCI-compatible-brightgreen)
 
 **关键词 / Keywords:** OpenWrt · LuCI · scutclient · drcom · SCUT · 华南理工大学 · 校园网 · 宽带认证 · campus network · broadband authentication · 802.1x · OpenWrt plugin · router authentication
