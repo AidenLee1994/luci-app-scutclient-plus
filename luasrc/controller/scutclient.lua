@@ -118,17 +118,43 @@ end
 
 function get_netstat()
 	local http = require "luci.http"
-	local sys = require "luci.sys"
+	local sys  = require "luci.sys"
+	local fs   = require "nixio.fs"
 
-	local hcontent = sys.exec("wget -O- http://whatismyip.akamai.com 2>/dev/null | head -n1")
-	local nstat = {}
-	if hcontent == '' then
-		nstat.stat = 'no_internet'
-	elseif hcontent:find("(%d+)%.(%d+)%.(%d+)%.(%d+)") then
-		nstat.stat = 'internet'
-	else
-		nstat.stat = 'no_login'
+	-- generate_204 probes: real internet → HTTP 204 + empty body
+	--                       captive portal → HTTP 200 + login-page body
+	--                       network failure → wget exit non-zero
+	-- Domestic CDN endpoints tried first for lower latency on Chinese campuses.
+	local probe_urls = {
+		"http://connect.rom.miui.com/generate_204",
+		"http://connectivitycheck.platform.hicloud.com/generate_204",
+		"http://wifi.vivo.com.cn/generate_204",
+	}
+
+	local tmpfile = "/tmp/.scutnetck_" .. tostring(os.time())
+	local nstat   = { stat = "no_internet" }
+
+	for _, url in ipairs(probe_urls) do
+		-- wget exit 0 = HTTP response received; non-zero = timeout / DNS failure
+		local ret = sys.call(
+			"wget -T 4 -q -O " .. tmpfile .. " '" .. url .. "' 2>/dev/null"
+		)
+		if ret == 0 then
+			local body = fs.readfile(tmpfile) or ""
+			fs.unlink(tmpfile)
+			if body == "" then
+				-- Empty body: server returned 204 — real internet
+				nstat.stat = "internet"
+			else
+				-- Non-empty body: captive portal returned a login page
+				nstat.stat = "no_login"
+			end
+			break
+		end
+		-- Network error on this probe — clean up and try the next one
+		fs.unlink(tmpfile)
 	end
+
 	http.prepare_content("application/json")
 	http.write_json(nstat)
 	http.close()
