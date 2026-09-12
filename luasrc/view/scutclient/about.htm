@@ -20,7 +20,8 @@ body.dark,:root[data-darkmode="true"]{
 --sc-sh:0 1px 3px rgba(0,0,0,.3);--sc-sh2:0 4px 14px rgba(0,0,0,.4);
 }
 
-.ab{width:100%;max-width:100%;box-sizing:border-box;animation:abIn .35s ease-out}
+.ab-wrap{display:flex;justify-content:center;align-items:flex-start;width:100%;box-sizing:border-box;padding:0 16px}
+.ab{width:min(100%,800px);box-sizing:border-box;animation:abIn .35s ease-out}
 @keyframes abIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* Author strip */
@@ -70,6 +71,7 @@ body.dark,:root[data-darkmode="true"]{
 @media(max-width:600px){.ab{padding:0 4px}}
 </style>
 
+<div class="ab-wrap">
 <div class="ab">
 
   <!-- Author -->
@@ -111,6 +113,7 @@ body.dark,:root[data-darkmode="true"]{
     <p class="ab-warn"><%:禁止任何个人或组织将本项目代码用于商业目的，由此产生的法律责任由使用者自行承担。%></p>
   </div>
 
+</div>
 </div>
 
 <%+footer%>
