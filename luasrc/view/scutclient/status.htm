@@ -185,7 +185,7 @@ body.dark,:root[data-darkmode="true"]{
 	<!-- Environment -->
 	<div class="sc-c">
 		<div class="sc-ct"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg><%:环境信息%></div>
-		<div class="sc-r"><span class="sc-rl">Wi-Fi</span><span class="sc-rv"><% if wifion then %><span style="color:var(--sc-accent);font-weight:600"><%=_ssid%></span><% else %><span class="sc-b sc-b-w"><%:未开启%></span><% end %></span></div>
+		<div class="sc-r"><span class="sc-rl">Wi-Fi</span><span class="sc-rv"><% if luci.sys.exec("ifconfig | grep -E 'ath[0-9]|wlan[0-9]|ra[0-9]|rax[0-9]|wl[0-9]'") ~= "" then %><span style="color:var(--sc-accent);font-weight:600"><%=_ssid%></span><% else %><span class="sc-b sc-b-w"><%:未开启%></span><% end %></span></div>
 		<div class="sc-r"><span class="sc-rl"><%:版本%></span><span class="sc-rv"><% if string.len(scutclient_version) > 1 then %><span class="sc-ver">v<%=scutclient_version%></span><% else %><span class="sc-b sc-b-e"><%:未安装%></span><% end %></span></div>
 		<div class="sc-r"><span class="sc-rl"><%:启动%></span><span class="sc-rv"><% if ss.enable == "1" then %><span class="sc-b sc-b-ok"><span class="sc-bd"></span> <%:已启用%></span><% else %><span class="sc-b sc-b-e"><span class="sc-bd"></span> <%:未启用%></span><% end %></span></div>
 		<div class="sc-r"><span class="sc-rl"><%:服务器%></span><span class="sc-rv" data-cb="cfg_server" data-val="<%=ss.server_auth_ip or ""%>" data-opts="202.38.210.131" form="sc_form"></span></div>
