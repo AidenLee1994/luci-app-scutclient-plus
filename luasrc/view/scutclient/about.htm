@@ -20,7 +20,7 @@ body.dark,:root[data-darkmode="true"]{
 --sc-sh:0 1px 3px rgba(0,0,0,.3);--sc-sh2:0 4px 14px rgba(0,0,0,.4);
 }
 
-.ab{max-width:560px;animation:abIn .35s ease-out}
+.ab{width:100%;max-width:100%;box-sizing:border-box;animation:abIn .35s ease-out}
 @keyframes abIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 
 /* Author strip */
@@ -54,9 +54,10 @@ body.dark,:root[data-darkmode="true"]{
 .ab-term{font-family:var(--sc-mono);font-size:.82em;
   background:var(--sc-accentL);border:1px solid var(--sc-line);
   border-radius:6px;padding:11px 14px;margin-bottom:10px;
-  line-height:1.8;color:var(--sc-txt)}
+  line-height:1.8;color:var(--sc-txt);overflow-wrap:break-word}
 .ab-term-prompt{color:var(--sc-accent);user-select:none}
 .ab-term-cat{color:var(--sc-txt);opacity:.75}
+.ab-cat{display:inline-block;margin:4px 16px 0 0;white-space:nowrap}
 .ab-note{font-size:.88em;color:var(--sc-txt2);line-height:1.65;margin-top:6px}
 
 /* License */
@@ -83,8 +84,6 @@ body.dark,:root[data-darkmode="true"]{
     <div>
       <div class="ab-name">Aiden Lee<span class="ab-pill">Dr. Lee · in progress</span></div>
       <div class="ab-sub">
-        <a href="mailto:dongdonglee1994@foxmail.com">dongdonglee1994@foxmail.com</a>
-        &nbsp;·&nbsp;
         <a href="https://www2.scut.edu.cn/cs/" target="_blank" rel="noopener">华南理工大学计算机科学与工程学院</a>
       </div>
       <div class="ab-sub" style="margin-top:2px;color:var(--sc-txt2)">
@@ -98,7 +97,7 @@ body.dark,:root[data-darkmode="true"]{
     <div class="ab-label"><%:致谢%></div>
     <div class="ab-term">
       <span class="ab-term-prompt">$ </span><span class="ab-term-cat">cat /home/aiden/cats.txt</span><br>
-      大白&nbsp;&nbsp;崽崽&nbsp;&nbsp;糖糖&nbsp;&nbsp;帕米&nbsp;&nbsp;可人
+      <span class="ab-cat">=^.^= 大白</span><span class="ab-cat">=^.^= 崽崽</span><span class="ab-cat">=^.^= 糖糖</span><span class="ab-cat">=^.^= 帕米</span><span class="ab-cat">=^.^= 可人</span>
     </div>
     <p class="ab-note"><%:感谢五只猫咪的陪伴，以及所有使用和贡献这个项目的同学。%></p>
   </div>
