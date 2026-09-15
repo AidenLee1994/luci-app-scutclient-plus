@@ -81,6 +81,15 @@ local function is_running()
 end
 
 local function wifi_on()
+	local is_on = false
+	uci:foreach("wireless", "wifi-iface", function(s)
+		if s.disabled ~= "1" and s.disabled ~= "true" then
+			is_on = true
+			return false
+		end
+	end)
+	if is_on then return true end
+
 	local r = luci.sys.exec("wifi status 2>/dev/null | grep up | head -n 1 | awk '{print $2}'")
 	return (string.sub(r or "", 1, 4) == "true")
 end
